@@ -1,0 +1,1 @@
+# plugins-smart-marketing-for-wp
