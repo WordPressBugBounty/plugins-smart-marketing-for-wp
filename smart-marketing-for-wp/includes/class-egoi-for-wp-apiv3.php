@@ -275,11 +275,13 @@ class EgoiApiV3 {
 		'convertCart'              => '/{domain}/carts',
 		'importContactsBulk'       => '/lists/{list_id}/contacts/actions/import-bulk',
 		'ping'					   => '/ping',
-	);
+        'getClient'             => '/my-account',
+    );
 
 	protected $apiKey;
 	protected $headers;
-	public function __construct( $apiKey ) {
+    protected $_valid = [];
+    public function __construct( $apiKey ) {
 		$this->apiKey  = $apiKey;
 		$this->headers = array( 'ApiKey: ' . $this->apiKey, 'PluginKey: ' . self::PLUGINKEY, 'Content-Type: application/json' );
 	}
@@ -1547,6 +1549,10 @@ class ClientHttp {
 			$this->http_code = $res['response']['code'];
 			$this->response  = $res['body'];
 			$this->headers   = $res['headers'];
+            if ( $res['response']['code'] == 403 ) {
+                do_action( 'api_error_notice' );
+                update_option( 'api_error_status', array( 'active' => true, 'code' => 403 ) );
+            }
 		}
 
 	}

@@ -35,6 +35,7 @@ class Egoi_For_Wp_Admin {
 	const FORM_OPTION_3   = 'egoi_form_sync_3';
 	const FORM_OPTION_4   = 'egoi_form_sync_4';
 	const FORM_OPTION_5   = 'egoi_form_sync_5';
+    Const Name_of_Plugin = 'Smart Marketing SMS and Newsletters Forms';
 
 	const BATCH_SIZE = 1000;
 
@@ -163,7 +164,25 @@ class Egoi_For_Wp_Admin {
 		//run update wp_options autoload
 		add_action( 'upgrader_process_complete', array( $this, 'updateEgoiSimpleForm' ));
 
+        // admin notifications for api error
+        add_action( 'api_error_notice', array( $this, 'show_api_error_notice' ) );
+
 	}
+
+    public function show_api_error_notice() {
+        if (!current_user_can('manage_options')) {
+            wp_die( 'You do not have sufficient permissions to access this page.' );
+        }
+
+        $error_status = get_option('api_error_status', array('active' => false));
+        if (!$error_status['active'] || $error_status['code'] !== 403) {
+            return;
+        }
+
+       echo '<div class="notice notice-error is-dismissible">
+            <p><strong>' . esc_html( self::Name_of_Plugin ) . ':</strong> ' . esc_html( 'Access has been denied. Check your API key settings or contact E-goi support.' ) . '</p>
+          </div>';
+    }
 
 	public function smsnf_main_dashboard_widget() {
 		wp_add_dashboard_widget(
@@ -179,6 +198,9 @@ class Egoi_For_Wp_Admin {
 	 * @since    1.0.0
 	 */
 	public function enqueue_styles() {
+        if (!current_user_can('manage_options')) {
+            wp_die( 'You do not have sufficient permissions to access this page.' );
+        }
 		wp_enqueue_style( $this->plugin_name . 'popup', plugin_dir_url( __FILE__ ) . 'css/egoi-for-wp-pop.css', array(), $this->version, 'all' );
 		wp_enqueue_style( $this->plugin_name . 'allpage', plugin_dir_url( __FILE__ ) . 'css/egoi-all-page.min.css', array(), $this->version, 'all' );
 		wp_enqueue_style( $this->plugin_name . 'select2css', plugin_dir_url( __FILE__ ) . 'js/font_awesome/select2.min.css', array(), $this->version, 'all' );
@@ -209,6 +231,9 @@ class Egoi_For_Wp_Admin {
 	 * @since    1.0.0
 	 */
 	public function enqueue_scripts() {
+        if (!current_user_can('manage_options')) {
+            wp_die( 'You do not have sufficient permissions to access this page.' );
+        }
 
 		wp_register_script( $this->plugin_name . 'select2', plugin_dir_url( __FILE__ ) . 'js/font_awesome/select2.full.min.js', array( 'jquery' ), true );
 		wp_enqueue_script( $this->plugin_name . 'select2' );
@@ -384,6 +409,9 @@ class Egoi_For_Wp_Admin {
 	 * @since    1.0.0
 	 */
 	public function add_plugin_admin_menu() {
+        if (!current_user_can('manage_options')) {
+            wp_die( 'You do not have sufficient permissions to access this page.' );
+        }
 		$bypass      = EgoiProductsBo::getProductsToBypass();
 		$bypassCount = count( ! is_array( $bypass ) ? array() : $bypass );
 
@@ -2122,6 +2150,9 @@ class Egoi_For_Wp_Admin {
 	}
 
 	public function egoi_remove_rss() {
+        if (!current_user_can('manage_options')) {
+            wp_die( 'You do not have sufficient permissions to access this page.' );
+        }
         check_ajax_referer( 'egoi_rss_manage', 'security' );
 
 		global $wpdb;
@@ -2622,6 +2653,9 @@ class Egoi_For_Wp_Admin {
 	}
 
 	public function smsnf_show_last_campaigns_reports() {
+        if (!current_user_can('manage_options')) {
+            wp_die( 'You do not have sufficient permissions to access this page.' );
+        }
 		$output = array(
 			'email'       => '',
 			'sms_premium' => '',
@@ -2802,18 +2836,13 @@ class Egoi_For_Wp_Admin {
 	}
 
 	public function smsnf_get_account_info() {
-		$customer = $this->egoiWpApi->getClient();
+		$customer = $this->egoiWpApi->getAccountEgoi();
 
 		return $customer;
 	}
 
 	public function smsnf_show_account_info( $destination ) {
 		$customer = $this->smsnf_get_account_info();
-
-		$output['notifications']  = $this->smsnf_show_notifications( $customer );
-		$email_limit              = $customer->PLAN_EMAIL_LIMIT != 0 ? $customer->PLAN_EMAIL_LIMIT : __( 'Unlimited', 'egoi-for-wp' );
-		$sms_limit                = $customer->PLAN_SMS_LIMIT != 0 ? $customer->PLAN_SMS_LIMIT : __( 'Unlimited', 'egoi-for-wp' );
-		$transactionalEmailOption = get_option( 'transactional_email_option' );
 
 		if ( $destination == 'wp-dashboard' ) {
 			$table_class       = 'table smsnf-wpdash--table';
@@ -2833,54 +2862,12 @@ class Egoi_For_Wp_Admin {
                 <tbody>
 					<tr>
 						<td><span class="smsnf-dashboard-account__content__table--total">' . __( 'Plan', 'egoi-for-wp' ) . '</span></td>
-						<td><span class="">' . $customer->CONTRACT . '</span></td>
+                        <td><span class="">' . strtoupper($customer->plan_info->type) . '</span></td>
                     </tr>
                     <tr>
 						<td><span class="smsnf-dashboard-account__content__table--total">' . __( 'Current Balance', 'egoi-for-wp' ) . '</span></td>
-						<td><span class="smsnf-dashboard-account__content__table--cash">' . $customer->CREDITS . '</span></td>
+						<td><span class="smsnf-dashboard-account__content__table--cash">' . $customer->balance_info->balance . ' ' .$customer->balance_info->currency . '</span></td>
                     </tr>';
-
-		if ( $customer->CONTRACT_EXPIRE_DATE ) {
-			$output['account'] .= '
-                        <tr>
-                            <td><span class="smsnf-dashboard-account__content__table--total">' . __( 'Expires in', 'egoi-for-wp' ) . '</span></td>
-                            <td><span class="">' . $customer->CONTRACT_EXPIRE_DATE . '</span></td>
-                        </tr>
-                        ';
-		}
-
-		$output['account'] .= '
-                </tbody>
-			</table>
-            <p class="smsnf-dashboard-account__content__table--subtitle">' . __( 'Your current plan includes', 'egoi-for-wp' ) . '</p>
-            <table class="' . $table_class . '">
-                <tbody>
-                    <tr>
-                        <td>Email/Push</td>
-                        <td><span class="">' . $email_limit . '</span></td>
-                    </tr>
-                    <tr>
-                        <td>SMS</td>
-                        <td><span class="">' . $sms_limit . '</span></td>
-                    </tr>
-                </tbody>
-            </table>
-            <p class="smsnf-dashboard-account__content__table--subtitle">' . __( 'Total sent', 'egoi-for-wp' ) . '</p>
-            <table class="' . $table_class . '">
-                <tbody>
-                    <tr>
-                        <td>Email/Push</td>
-                        <td><span class="">' . $customer->PLAN_EMAIL_SENT . '</span></td>
-                    </tr>
-                    <tr>
-                        <td>SMS</td>
-                        <td><span class="">' . $customer->PLAN_SMS_SENT . '</span></td>
-                    </tr>
-                    <tr>
-                        <td>' . __( 'Transactional Email', 'egoi-for-wp' ) . '</td>
-                        <td><span class="">' . $transactionalEmailOption['sent'] . '</span></td>
-                    </tr>
-        ';
 
 		$plugins       = apply_filters( 'active_plugins', get_option( 'active_plugins' ) );
 		$sms_installed = false;
@@ -2949,6 +2936,9 @@ class Egoi_For_Wp_Admin {
 	}
 
 	public function smsnf_show_account_info_ajax() {
+        if (!current_user_can('manage_options')) {
+            wp_die( 'You do not have sufficient permissions to access this page.' );
+        }
 		$output = $this->smsnf_show_account_info( 'smart-marketing-dashboard' );
 		wp_send_json_success($output);
 	}
@@ -3038,13 +3028,17 @@ class Egoi_For_Wp_Admin {
 	}
 
 	public function egoi_change_api_key() {
+        if (!current_user_can('manage_options')) {
+            wp_die( 'You do not have sufficient permissions to access this page.' );
+        }
 		check_ajax_referer( 'egoi_create_campaign', 'security' );
 
 		if ( empty( $_POST['egoi_key'] ) ) {
 			wp_send_json_error( __( 'Apikey is required', 'egoi-for-wp' ) );
 		}
 
-		$clientData = $this->egoiWpApi->getClient( $_POST['egoi_key'] );
+        $clientData = $this->egoiWpApi->getAccountEgoi( $_POST['egoi_key'] );
+
 		if ( empty( $clientData ) ) {
 			wp_send_json_error( __( 'Apikey not valid', 'egoi-for-wp' ) );
 		}
@@ -3053,6 +3047,9 @@ class Egoi_For_Wp_Admin {
 
 
 	public function egoi_count_subs() {
+        if (!current_user_can('manage_options')) {
+            wp_die( 'You do not have sufficient permissions to access this page.' );
+        }
 
 		check_ajax_referer( 'egoi_core_actions', 'security' );
 
@@ -3092,6 +3089,9 @@ class Egoi_For_Wp_Admin {
 	}
 
     public function efwp_remove_data(){
+        if (!current_user_can('manage_options')) {
+            wp_die( 'You do not have sufficient permissions to access this page.' );
+        }
         check_ajax_referer( 'egoi_core_actions', 'security' );
 
         $rmdata = sanitize_text_field($_POST['rmdata']);
@@ -3103,6 +3103,9 @@ class Egoi_For_Wp_Admin {
     }
 
     public function efwp_apikey_changes() {
+        if (!current_user_can('manage_options')) {
+            wp_die( 'You do not have sufficient permissions to access this page.' );
+        }
         check_ajax_referer( 'egoi_core_actions', 'security' );
         if(Egoi_For_Wp::removeData( true, true )){
             wp_send_json_success();
@@ -3111,9 +3114,12 @@ class Egoi_For_Wp_Admin {
     }
 
     public function efwp_apikey_save(){
+        if (!current_user_can('manage_options')) {
+            wp_die( 'You do not have sufficient permissions to access this page.' );
+        }
         check_ajax_referer( 'egoi_core_actions', 'security' );
         $apikey2save = sanitize_key( $_POST['apikey'] );
-        $accountData = $this->egoiWpApi->getClient( $apikey2save );
+        $accountData = $this->egoiWpApi->getAccountEgoi( $apikey2save );
 
         if ( empty( $apikey2save ) || empty( $accountData ) ) {
             wp_send_json_error( __( 'Invalid API Key!', 'egoi-for-wp' ) );
@@ -3137,13 +3143,9 @@ class Egoi_For_Wp_Admin {
         }
 
         wp_send_json_success(['message' => __( 'API Key updated!', 'egoi-for-wp' )]);
-
-
-
     }
 
 	public function egoi_synchronize_subs() {
-
 		check_ajax_referer( 'egoi_core_actions', 'security' );
 		$page = sanitize_text_field( $_POST['page'] );
 
