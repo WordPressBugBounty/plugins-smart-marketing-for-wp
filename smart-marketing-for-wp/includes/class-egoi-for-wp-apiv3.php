@@ -337,12 +337,20 @@ class EgoiApiV3 {
 			}
 		}
 
-		$data = $this->getCountriesCurrencies( $cellphone );
+		$data = $this->getCountriesCurrencies();
 		if ( empty( $data ) ) {
 			return $cellphone;
 		}
-		$language = get_option( 'WPLANG' );
-		foreach ( $data['items'] as $country ) {
+
+        $wplang = get_option( 'WPLANG' );
+        if ( !empty($wplang) ) {
+            $language = $wplang;
+        } else {
+            $raw_locale = get_locale();
+            $parts        = preg_split( '/[_-]/', $raw_locale );
+            $language = isset( $parts[1] ) ? strtoupper( $parts[1] ) : strtoupper( $parts[0] );
+        }
+        foreach ( $data['items'] as $country ) {
 			if ( strpos( $language, $country['iso_code'] ) !== false ) {
 				return $country['country_code'] . '-' . $cellphone;
 			}
@@ -904,7 +912,6 @@ class EgoiApiV3 {
 			$fname = implode(' ', array_slice($full_name,0,-1));
 
 		}
-
 		$tel  = (isset($ref_fields['tel']) && !empty($ref_fields['tel']) && $ref_fields['tel'] != '-') ? $this->advinhometerCellphoneCode($ref_fields['tel']) : '';
 		$cell = (isset($ref_fields['cell']) && !empty($ref_fields['cell']) && $ref_fields['cell'] != '-' ) ? $this->advinhometerCellphoneCode($ref_fields['cell']) : '';
 		$bd   = isset($ref_fields['bd']) ? $ref_fields['bd'] : '';
@@ -917,12 +924,12 @@ class EgoiApiV3 {
 			'status'     => $status,
 		);
 
-		// telephone
+        // telephone
 		if ( !empty($tel) ) {
-			$params['cellphone'] = $tel;
+			$params['phone'] = $tel;
 		}
 		// cellphone
-		if ( !empty($cell) && empty($tel) ) {
+		if ( !empty($cell)) {
 			$params['cellphone'] = $cell;
 		}
 		// birthdate
@@ -1002,7 +1009,7 @@ class EgoiApiV3 {
 		if($httpCode == 409 && $editContact == 'true'){
 			return  $this->editContact( $listID, $resp['errors']['contacts'][0], $name, $lname, $extra_fields, $option, $ref_fields, $status, $tags );
 		} elseif ( $httpCode == 201){
-			if ( ! empty( $tags ) && isset( $resp['contact_id'] ) ) {
+            if ( ! empty( $tags ) && isset( $resp['contact_id'] ) && $tags[0] !== "0" ) {
 				$this->attachTag( $listID, $resp['contact_id'], $tags );
 			}
 			return $resp['contact_id'];
@@ -1237,8 +1244,8 @@ class EgoiApiV3 {
 
 		$params = array();
 
-		$tel  = isset($ref_fields['tel']) ? $ref_fields['tel'] : '';
-		$cell = isset($ref_fields['cell']) ? $ref_fields['cell'] : '';
+        $tel  = (isset($ref_fields['tel']) && !empty($ref_fields['tel']) && $ref_fields['tel'] != '-') ? $this->advinhometerCellphoneCode($ref_fields['tel']) : '';
+        $cell = (isset($ref_fields['cell']) && !empty($ref_fields['cell']) && $ref_fields['cell'] != '-' ) ? $this->advinhometerCellphoneCode($ref_fields['cell']) : '';
 		$bd   = isset($ref_fields['bd']) ? $ref_fields['bd'] : '';
 		$lang = isset($ref_fields['lang']) ? $ref_fields['lang'] : '';
 
