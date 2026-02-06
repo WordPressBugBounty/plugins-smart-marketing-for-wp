@@ -275,8 +275,10 @@ class EgoiApiV3 {
 		'convertCart'              => '/{domain}/carts',
 		'importContactsBulk'       => '/lists/{list_id}/contacts/actions/import-bulk',
 		'ping'					   => '/ping',
-        'getClient'             => '/my-account',
-        'importOrdersBulk'         => '/lists/{list_id}/orders'
+        'getClient'                => '/my-account',
+        'importOrdersBulk'         => '/lists/{list_id}/orders',
+        'getCampaigns'             => '/campaigns',
+        'getReports'               => '/reports/{channel}/{campaign_hash}',
     );
 
 	protected $apiKey;
@@ -639,6 +641,68 @@ class EgoiApiV3 {
 		}
 
 	}
+
+    /**
+     * @return false|string
+     */
+    public function getCampaigns() {
+
+        $url = self::APIV3 . self::APIURLS[ __FUNCTION__ ];
+
+        $client = new ClientHttp(
+            $url,
+            'GET',
+            $this->headers
+        );
+
+        if ( $client->success() !== true ) {
+            return $this->processErrors( $client->getError() );
+        }
+
+        $resp = json_decode( $client->getResponse(), true );
+
+        if($client->getCode() == 200 && isset( $resp['items'] )){
+            $return = $resp['items'];
+            return $return;
+        } else {
+            return $this->processErrors( $client->getResponse() );
+        }
+
+    }
+
+    /**
+     * @param string $channel
+     * @param string $campaign_hash
+     * @return array|false|string
+     */
+    public function getReports(string $channel, string $campaign_hash): array
+    {
+        $path = self::APIV3 . $this->replaceUrl(
+                self::APIURLS[__FUNCTION__],
+                ['{channel}', '{campaign_hash}'],
+                [$channel, $campaign_hash]
+            );
+
+        $client = new ClientHttp(
+            $path,
+            'GET',
+            $this->headers
+        );
+
+        if ($client->getCode() !== 200) {
+            return $this->processErrors(
+                $client->getError() ?: $client->getResponse()
+            );
+        }
+
+        $resp = json_decode($client->getResponse(), true);
+
+        if (json_last_error() !== JSON_ERROR_NONE) {
+            return $this->processErrors('Invalid JSON response');
+        }
+
+        return $resp;
+    }
 
 	/**
 	 * @return false|string
@@ -1076,7 +1140,7 @@ class EgoiApiV3 {
 	 * If doesnt exists creates one tag
 	 */
 	public function getTag( $name ) {
-		$tags = json_decode( $this->getTags() );
+		$tags = json_decode( $this->getTags(), true );
 
 		if ( isset( $tags['status'] ) || isset( $tags['error'] ) ) {
 			return $tags;
@@ -1100,7 +1164,7 @@ class EgoiApiV3 {
 	 * If doesnt exists creates one tag
 	 */
 	public function getTagById( $id ) {
-		$tags = json_decode( $this->getTags() );
+		$tags = json_decode( $this->getTags(), true );
 
 		$data = array();
 		if ( isset( $tags['status'] ) || isset( $tags['error'] ) ) {
@@ -1223,6 +1287,10 @@ class EgoiApiV3 {
 
 		$extra_fields = array();
 		foreach ( $result_client as $fields ) {
+            if (isset($fields['format']) && $fields['format'] === 'options') {
+                continue;
+            }
+
 			if ( $fields['type'] == 'extra' && $type == 'id' ) {
 				array_push( $extra_fields, $fields['field_id'] );
 			} else if ( $fields['type'] == 'extra' ){
@@ -1633,13 +1701,31 @@ class ClientHttp {
 			$this->headers   = array();
 			return;
 		}
+
+		// Convert headers from array format 'Header: value' to associative array
+		$formatted_headers = array();
+		if ( is_array( $headers ) ) {
+			foreach ( $headers as $header ) {
+				if ( is_string( $header ) && strpos( $header, ':' ) !== false ) {
+					list( $key, $value ) = explode( ':', $header, 2 );
+					$formatted_headers[ trim( $key ) ] = trim( $value );
+				}
+			}
+		}
+
+		// Convert body to JSON if it's an array
+		$request_body = $body;
+		if ( is_array( $body ) && ! empty( $body ) ) {
+			$request_body = wp_json_encode( $body );
+		}
+
 		$res = wp_remote_request(
 			$url,
 			array(
 				'method'  => $method,
 				'timeout' => 30,
-				'body'    => $body,
-				'headers' => $headers,
+				'body'    => $request_body,
+				'headers' => $formatted_headers,
 			)
 		);
 

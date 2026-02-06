@@ -8,6 +8,8 @@ jQuery( document ).ready(
 			var catalog_currency      = $( '#catalog_currency' );
 			var create_catalog_button = $( '#create_catalog_button' );
 			var catalog_tax 		  = $( '#catalog_tax' );
+			var related_products      = $( '#related_products' );
+			var related_products_type_wrapper = $( '#related_products_type_wrapper' );
 
 			// defaults
 			var default_store_country  = $( '#default-store-country' );
@@ -25,6 +27,15 @@ jQuery( document ).ready(
 						if ($( '#preventCatalogSubmit' ).length) {
 							return;
 						}
+						// Ensure related_products_type is always included when related_products is checked
+						if (related_products.is(':checked')) {
+							var relatedProductsType = $( '#related_products_type' );
+							if (!relatedProductsType.val()) {
+								relatedProductsType.val('upsells');
+							}
+							// Make sure the field is enabled for serialization
+							relatedProductsType.prop('disabled', false);
+						}
 						$( '#form-create-catalog' ).submit();
 					}
 				}
@@ -34,6 +45,17 @@ jQuery( document ).ready(
 				'click',
 				function () {
 					$( $( $( this ).parent()[0] ).parent()[0] ).hide();
+				}
+			);
+
+			related_products.on(
+				'change',
+				function () {
+					if ( $( this ).is( ':checked' ) ) {
+						related_products_type_wrapper.slideDown();
+					} else {
+						related_products_type_wrapper.slideUp();
+					}
 				}
 			);
 
