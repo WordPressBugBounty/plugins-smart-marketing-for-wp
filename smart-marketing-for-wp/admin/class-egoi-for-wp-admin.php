@@ -1000,14 +1000,12 @@ class Egoi_For_Wp_Admin {
 			) {
 				return false;
 			}
-			preg_match_all( '/\[[a-zA-Z0-9]+\*? .+\]/', $result->form, $fields_in_form );
+			preg_match_all( '/\[([a-zA-Z0-9]+)\*?\s+([^\s\]]+)/', $result->form, $fields_in_form, PREG_SET_ORDER );
 
 			$mapp = array();
-			foreach ( $fields_in_form[0] as $field ) {
-				$typearr = preg_split( '/\ +/', $field );
-				$type    = ltrim( $typearr[0], '[' );
-				$type    = str_replace( '*', '', $type );
-				$key     = $typearr[1];
+			foreach ( $fields_in_form as $field ) {
+				$type = $field[1];
+				$key  = $field[2];
 				if ( empty( $mapp[ $type ] ) ) {
 					$mapp[ $type ] = $key;
 				}
@@ -1043,22 +1041,32 @@ class Egoi_For_Wp_Admin {
 
 			// telephone
 			$bo  = new EgoiProductsBo();
-            $tel = '';
-            if(!empty($mapp['tel']) && !empty($_POST[$mapp['tel']])) {
-			    $tel = $bo->advinhometerCellphoneCode( sanitize_key( $_POST[$mapp['tel']] ) );
-            }
+			$tel = '';
+			// skip if the field name refers to a mobile number,
+			// it is handled by the cellphone mapping below (avoids duplicates)
+			if ( ! empty( $mapp['tel'] ) 
+				&& strpos( $mapp['tel'], 'cell' ) === false 
+				&& strpos( $mapp['tel'], 'mobile' ) === false 
+				&& strpos( $mapp['tel'], 'telemovel' ) === false 
+				&& strpos( $mapp['tel'], 'telemóvel' ) === false 
+				&& ! empty( $_POST[ $mapp['tel'] ] ) ) {
+				$tel = $bo->advinhometerCellphoneCode( sanitize_key( $_POST[ $mapp['tel'] ] ) );
+			}
 
-            $cell = '';
+			$cell = '';
 			// cellphone
+			$mobile = array();
 			foreach ( $_POST as $key_cell => $value_cell ) {
-				$cell = strpos( $key_cell, 'cell' );
-				if ( $cell !== false ) {
+				if ( strpos( $key_cell, 'cell' ) !== false 
+					|| strpos( $key_cell, 'mobile' ) !== false 
+					|| strpos( $key_cell, 'telemovel' ) !== false 
+					|| strpos( $key_cell, 'telemóvel' ) !== false ) {
 					$mobile[] = sanitize_key( $value_cell );
 				}
 			}
-            if(!empty($mobile[0])) {
-			    $cell = $bo->advinhometerCellphoneCode( sanitize_key( $mobile[0] ) );
-            }
+			if ( ! empty( $mobile[0] ) ) {
+				$cell = $bo->advinhometerCellphoneCode( sanitize_key( $mobile[0] ) );
+			}
 
 			// birthdate
             $bd = '';
